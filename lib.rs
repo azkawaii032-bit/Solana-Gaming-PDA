@@ -8,33 +8,47 @@ pub mod solana_gaming_profile {
     use super::*;
 
     /// =======================================================================
-    /// C - CREATE: Crea un nuevo perfil de jugador (PDA) vinculado a su wallet
+    /// C - CREATE: Crea un nuevo perfil de jugador (PDA)
     /// =======================================================================
     pub fn crear_jugador(ctx: Context<CrearJugador>, username: String) -> Result<()> {
         let jugador = &mut ctx.accounts.jugador;
         
-        // Inicializamos los datos del jugador
         jugador.owner = ctx.accounts.owner.key();
         jugador.username = username;
-        jugador.nivel = 1; // Todos empiezan en nivel 1
+        jugador.nivel = 1; 
         jugador.xp = 0;
-        jugador.bump = ctx.bumps.jugador; // Guardamos el bump generado por el PDA
+        jugador.is_active = true; // Inicializamos el estado alternable en verdadero
+        jugador.bump = ctx.bumps.jugador; 
         
-        msg!("¡Perfil creado! Jugador: {} | Nivel: {}", jugador.username, jugador.nivel);
+        msg!("¡Perfil creado! Jugador: {} | Activo: {}", jugador.username, jugador.is_active);
         Ok(())
     }
 
     /// =======================================================================
-    /// U - UPDATE: Añade experiencia al jugador y lo sube de nivel si es necesario
+    /// R - READ: Ver los datos actuales del jugador (Solo Lectura)
+    /// =======================================================================
+    pub fn ver_jugador(ctx: Context<VerJugador>) -> Result<()> {
+        // Observa que aquí no usamos "&mut" porque no vamos a modificar nada, solo leer.
+        let jugador = &ctx.accounts.jugador;
+        
+        msg!("--- ESTADÍSTICAS DEL JUGADOR ---");
+        msg!("Nombre: {}", jugador.username);
+        msg!("Nivel: {} | XP: {}", jugador.nivel, jugador.xp);
+        msg!("Estado Activo: {}", jugador.is_active);
+        
+        Ok(())
+    }
+
+    /// =======================================================================
+    /// U - UPDATE 1: Añade experiencia al jugador
     /// =======================================================================
     pub fn ganar_experiencia(ctx: Context<ModificarJugador>, xp_ganada: u32) -> Result<()> {
         let jugador = &mut ctx.accounts.jugador;
         jugador.xp += xp_ganada;
         
-        // Lógica del juego: Cada 100 XP se sube de nivel
         if jugador.xp >= 100 {
             jugador.nivel += 1;
-            jugador.xp -= 100; // Restamos la XP usada para subir de nivel
+            jugador.xp -= 100;
             msg!("¡Level Up! {} ha alcanzado el nivel {}", jugador.username, jugador.nivel);
         } else {
             msg!("{} ganó {} XP. Total XP: {}", jugador.username, xp_ganada, jugador.xp);
@@ -43,18 +57,29 @@ pub mod solana_gaming_profile {
     }
 
     /// =======================================================================
-    /// D - DELETE: Elimina el perfil del jugador y devuelve los SOL de renta
+    /// U - UPDATE 2: Alternar el estado activo/inactivo del jugador
+    /// =======================================================================
+    pub fn alternar_estado(ctx: Context<ModificarJugador>) -> Result<()> {
+        let jugador = &mut ctx.accounts.jugador;
+        
+        // Invertimos el valor booleano actual (si es true pasa a false, y viceversa)
+        jugador.is_active = !jugador.is_active;
+        
+        msg!("El estado de conexión de {} ha cambiado. Activo: {}", jugador.username, jugador.is_active);
+        Ok(())
+    }
+
+    /// =======================================================================
+    /// D - DELETE: Elimina el perfil del jugador
     /// =======================================================================
     pub fn eliminar_jugador(_ctx: Context<EliminarJugador>) -> Result<()> {
-        // La macro 'close' en el contexto se encarga de transferir los fondos 
-        // de vuelta al owner y borrar la cuenta de la blockchain.
         msg!("Perfil de jugador eliminado. Los SOL de renta han sido devueltos.");
         Ok(())
     }
 }
 
 // ----------------------------------------------------------------------------
-// ESTRUCTURAS DE CONTEXTO (Donde definimos el PDA y permisos)
+// ESTRUCTURAS DE CONTEXTO
 // ----------------------------------------------------------------------------
 
 #[derive(Accounts)]
@@ -62,9 +87,8 @@ pub struct CrearJugador<'info> {
     #[account(
         init, 
         payer = owner, 
-        // Espacio: Discriminador(8) + Pubkey(32) + String Prefix(4) + String(20 max) + u16(2) + u32(4) + u8(1)
-        space = 8 + 32 + 4 + 20 + 2 + 4 + 1, 
-        // ¡REQUISITO PDA!: Usamos "perfil" y la llave pública del creador como semillas
+        // Agregamos 1 byte extra al espacio de memoria para guardar el nuevo campo booleano
+        space = 8 + 32 + 4 + 20 + 2 + 4 + 1 + 1, 
         seeds = [b"perfil", owner.key().as_ref()], 
         bump
     )]
@@ -74,23 +98,35 @@ pub struct CrearJugador<'info> {
     pub system_program: Program<'info, System>,
 }
 
+// Nueva estructura exclusiva para la función de lectura (sin el atributo mut)
+#[derive(Accounts)]
+pub struct VerJugador<'info> {
+    #[account(
+        seeds = [b"perfil", owner.key().as_ref()],
+        bump = jugador.bump,
+        has_one = owner
+    )]
+    pub jugador: Account<'info, Jugador>,
+    pub owner: Signer<'info>,
+}
+
 #[derive(Accounts)]
 pub struct ModificarJugador<'info> {
     #[account(
         mut,
         seeds = [b"perfil", owner.key().as_ref()],
         bump = jugador.bump,
-        has_one = owner // ¡Seguridad!: Solo el dueño original puede modificar su XP
+        has_one = owner 
     )]
     pub jugador: Account<'info, Jugador>,
-    pub owner: Signer<'info>, // Quien firma la transacción
+    pub owner: Signer<'info>, 
 }
 
 #[derive(Accounts)]
 pub struct EliminarJugador<'info> {
     #[account(
         mut,
-        close = owner, // REQUISITO DELETE: Transfiere los lamports de regreso al owner
+        close = owner, 
         seeds = [b"perfil", owner.key().as_ref()],
         bump = jugador.bump,
         has_one = owner
@@ -101,14 +137,15 @@ pub struct EliminarJugador<'info> {
 }
 
 // ----------------------------------------------------------------------------
-// ESTRUCTURA DE LA CUENTA (El estado guardado en la blockchain)
+// ESTRUCTURA DE LA CUENTA
 // ----------------------------------------------------------------------------
 
 #[account]
 pub struct Jugador {
-    pub owner: Pubkey,   // Dueño de la cuenta
-    pub username: String, // Nombre en el juego
-    pub nivel: u16,      // Nivel actual
-    pub xp: u32,         // Experiencia actual
-    pub bump: u8,        // Bump del PDA
+    pub owner: Pubkey,   
+    pub username: String, 
+    pub nivel: u16,      
+    pub xp: u32,         
+    pub is_active: bool, // función Alternar
+    pub bump: u8,        
 }
