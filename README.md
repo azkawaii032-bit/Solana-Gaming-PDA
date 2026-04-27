@@ -1,23 +1,47 @@
-# Solana-Gaming-PDA
-- (CRUD + PDA)
+-🎮Solana Gaming Profile (CRUD + Toggle + PDA) 
 
-Este proyecto es un contrato inteligente desarrollado en Solana utilizando Rust y el framework Anchor. Fue creado como proyecto de certificación y simula un sistema backend para perfiles de jugadores en un videojuego (Web3 Gaming).
+Este repositorio contiene la versión mejorada y completa del contrato inteligente para la gestión de perfiles de jugadores en la red de Solana. El proyecto ha sido desarrollado utilizando Rust y el framework Anchor, cumpliendo con los requisitos de un sistema CRUD completo, manejo de PDA (Program Derived Addresses) e instrucciones de estado alternable
 
-- Descripción del Proyecto
+-Descripción del Proyecto-
 
-El programa permite gestionar la progresión de un jugador utilizando un **PDA (Program Derived Address)**. El uso del PDA garantiza que cada wallet solo pueda tener un único perfil asociado, evitando cuentas duplicadas y asegurando que solo el dueño de la wallet pueda modificar su progreso.
+El programa permite administrar la persistencia de datos de jugadores de forma descentralizada. Se utiliza un PDA basado en la wallet del usuario para garantizar la propiedad única del perfil: un usuario, un perfil.
 
-### Funcionalidades (CRUD)
-* **Create:** La instrucción `crear_jugador` inicializa una cuenta PDA usando como semilla la palabra "perfil" y la Public Key del usuario. Se le asigna un nombre de usuario (String), nivel 1 y 0 de experiencia.
-* **Read:** Al estar desplegado en la red, cualquier cliente puede consultar la cuenta PDA del jugador para leer su `username`, `nivel` y `xp` de forma pública y transparente.
-* **Update:** La instrucción `ganar_experiencia` permite sumar XP al perfil. El contrato incluye lógica interna: por cada 100 XP obtenidos, el jugador sube de nivel automáticamente y la experiencia sobrante se conserva. Solo el creador (Signer) puede invocar esto.
-* **Delete:** La instrucción `eliminar_jugador` permite al usuario borrar su perfil del juego. Al cerrar la cuenta, los lamports retenidos por la renta de la blockchain son devueltos automáticamente a la wallet del dueño.
+-Funcionalidades Implementadas (CRUD + Toggle)
 
--test del codigo
+1.  **Create (Crear):** La instrucción `crear_jugador` inicializa la cuenta en la blockchain, asignando un nombre de usuario, nivel inicial (1), experiencia (0) y estado activo (`true`).
+2.  **Read (Leer):** Se implementó la función `ver_jugador`. A diferencia de otras instrucciones, esta es de solo lectura (no mutable), permitiendo consultar las estadísticas del jugador (Nombre, Nivel, XP, Estado) directamente desde el programa.
+3.  **Update (Actualizar - XP):** La función `ganar_experiencia` permite modificar la XP del jugador. Incluye lógica de negocio para subir de nivel automáticamente al alcanzar cada 100 puntos de experiencia.
+4.  **Update (Actualizar - Toggle/Alternar):** Se añadió la función `alternar_estado`. Esta permite cambiar el estado del jugador entre "Activo" e "Inactivo" (True/False), cumpliendo con el requisito de alternancia de estado.
+5.  **Delete (Eliminar):** La instrucción `eliminar_jugador` cierra la cuenta del PDA y devuelve los lamports (SOL) depositados por concepto de renta a la wallet del propietario original.
 
-1. Abre [Solana Playground](https://beta.solpg.io/).
-2. Crea un nuevo proyecto y pega el código de `lib.rs`.
-3. Haz clic en **Build** para compilar el programa.
-4. Asegúrate de tener fondos en Devnet (`solana airdrop 2` en la terminal).
-5. Haz clic en **Deploy** para subir el contrato a la red de prueba.
-6. Utiliza el panel de cliente generado automáticamente a la izquierda para ejecutar las instrucciones (`crear_jugador`, `ganar_experiencia`, `eliminar_jugador`).
+ -Requisitos Técnicos
+
+* **Lenguaje:** Rust
+* **Framework:** Anchor
+* **Entorno:** Solana Playground o Solana CLI local.
+* **Red:** Devnet (requiere SOL de prueba).
+
+-Cómo utilizar este proyecto(si se usa de ejemplo para otro proyecto)
+
+-Preparación en Solana Playground
+1. Dirígete a [Solana Playground](https://beta.solpg.io/).
+2. Crea un nuevo proyecto e importa el código contenido en `lib.rs`.
+3. Ejecuta `Build` para compilar el programa.
+
+-Despliegue (Deploy)
+1. Asegúrate de tener saldo en tu wallet de Playground: `solana airdrop 2`.
+2. Haz clic en `Deploy` para subir el contrato a la Devnet.
+
+-Interacción
+Una vez desplegado, utiliza el panel de "Client" para ejecutar las siguientes funciones en orden:
+* **`crear_jugador`**: Envía un nombre (string).
+* **`ver_jugador`**: Consulta tus datos actuales.
+* **`ganar_experiencia`**: Suma puntos para subir de nivel.
+* **`alternar_estado`**: Cambia tu estado de conexión.
+* **`eliminar_jugador`**: Borra el perfil y recupera tu SOL.
+
+ -Seguridad
+El contrato utiliza validaciones de seguridad mediante `has_one = owner` y semillas de PDA, asegurando que solo el dueño de la wallet pueda modificar o eliminar su propio perfil de juego.
+
+---
+Desarrollado para la Certificación de Desarrollador Solana
